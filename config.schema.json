@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "LuxaflexHomeConnection",
   "pluginType": "platform",
   "singular": true,
   "schema": {

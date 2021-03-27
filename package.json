@@ -1,6 +1,6 @@
 {
   "private": true,
-  "displayName": "Luxaflex Home Connection Homebridge Plugin",
+  "displayName": "Homebridge Luxaflex Home Connection",
   "name": "homebridge-luxaflex-home-connection",
   "version": "1.0.0",
   "description": "A short description about what your plugin does.",
