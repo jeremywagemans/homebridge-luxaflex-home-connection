@@ -1,6 +1,5 @@
 import { Logger } from 'homebridge';
 import * as http from 'http';
-import { type } from 'node:os';
 
 const MIN_POSITION = 0;
 const MAX_POSITION = 100;
