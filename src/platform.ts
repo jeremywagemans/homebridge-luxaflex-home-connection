@@ -64,7 +64,7 @@ export class LuxaflexHomeConnectionPlatform implements DynamicPlatformPlugin {
     // Removing accessories that have been removed from config
     cachedAccessories.forEach((accessory) => {
       if(!this.accessories.find((it) => it.UUID === accessory.UUID)) {
-        this.log.info(`Removing existing accessory from cache: ${accessory.context.blindName} (${accessory.context.blindCode})`);
+        this.log.info(`Removing accessory from platform: ${accessory.context.blindName} (${accessory.context.blindCode})`);
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     });
