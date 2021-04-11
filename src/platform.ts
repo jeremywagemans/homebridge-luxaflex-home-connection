@@ -3,16 +3,12 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { BlindControllerService } from './blindControllerService';
 
-const MIN_POSITION = 0;
-const MAX_POSITION = 100;
-const BLIND_OPENING_TIME = 25000;
-
 export class LuxaflexHomeConnectionPlatform implements DynamicPlatformPlugin {
 
   private readonly Service: typeof Service = this.api.hap.Service;
   private readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   private blindControllerService: BlindControllerService;
-  private readonly accessories: PlatformAccessory[] = [];
+  private accessories: PlatformAccessory[] = [];
 
   constructor(
     public readonly log: Logger,
@@ -35,43 +31,43 @@ export class LuxaflexHomeConnectionPlatform implements DynamicPlatformPlugin {
       const blindCode = accessory.context.blindCode;
       const positionStateCharacteristic = service.getCharacteristic(this.Characteristic.PositionState);
       const currentPositionCharacteristic = service.getCharacteristic(this.Characteristic.CurrentPosition);
-      if (value > MIN_POSITION && value < MAX_POSITION) {
-        this.log.debug(`Updating current position to ${value} ('${accessory.displayName}'): this feature is currently not supported`);
-        return;
-      }
-      if (value === MIN_POSITION) {
-        this.log.debug(`Closing blind ('${accessory.displayName})`);
-        this.blindControllerService.close(blindCode);
-        positionStateCharacteristic.setValue(this.Characteristic.PositionState.DECREASING);
-      } else {
-        this.log.debug(`Opening blind ('${accessory.displayName}')`);
-        this.blindControllerService.open(blindCode);
-        positionStateCharacteristic.setValue(this.Characteristic.PositionState.INCREASING);
-      }
-      setTimeout(() => {
-        this.log.debug(`Updating position state to STOPPED (${accessory.displayName})`);
-        positionStateCharacteristic.setValue(this.Characteristic.PositionState.STOPPED);
-        currentPositionCharacteristic.setValue(value);
-      }, BLIND_OPENING_TIME);
+      this.blindControllerService.move(blindCode, value as number, {
+        opening: () => positionStateCharacteristic.setValue(this.Characteristic.PositionState.INCREASING),
+        closing: () => positionStateCharacteristic.setValue(this.Characteristic.PositionState.DECREASING),
+        stopped: () => {
+          positionStateCharacteristic.setValue(this.Characteristic.PositionState.STOPPED);
+          currentPositionCharacteristic.setValue(value);
+        },
+      });
     });
     this.accessories.push(accessory);
   }
 
   private discoverAccessories() {
     const blinds = this.config.blinds;
+    const cachedAccessories = [...this.accessories];
+    this.accessories = [];
     for (const blind of blinds) {
       const blindName = blind.name;
       const blindCode = blind.code;
       const accessoryUUID = this.api.hap.uuid.generate(blindCode);
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === accessoryUUID);
-      if (existingAccessory) {
+      const cachedAccessory = cachedAccessories.find(accessory => accessory.UUID === accessoryUUID);
+      if (cachedAccessory) {
         this.log.info(`Restoring existing accessory from cache: ${blind.name} (${accessoryUUID})`);
+        this.accessories.push(cachedAccessory);
       } else {
         this.log.info(`Adding new accessory: ${blind.name} (${accessoryUUID})`);
-        const accessory = this.createAccessory(accessoryUUID, blindName, blindCode);
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        const newAccessory = this.createAccessory(accessoryUUID, blindName, blindCode);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [newAccessory]);
       }
     }
+    // Removing accessories that have been removed from config
+    cachedAccessories.forEach((accessory) => {
+      if(!this.accessories.find((it) => it.UUID === accessory.UUID)) {
+        this.log.info(`Removing existing accessory from cache: ${accessory.context.blindName} (${accessory.context.blindCode})`);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+    });
   }
 
   private createAccessory(accessoryUUID: string, blindName: string, blindCode: string): PlatformAccessory {
@@ -80,6 +76,7 @@ export class LuxaflexHomeConnectionPlatform implements DynamicPlatformPlugin {
       .setCharacteristic(this.Characteristic.Manufacturer, 'Luxaflex')
       .setCharacteristic(this.Characteristic.Model, 'Smart-Shade')
       .setCharacteristic(this.Characteristic.SerialNumber, blindCode);
+    accessory.context.blindName = blindName;
     accessory.context.blindCode = blindCode;
     this.configureAccessory(accessory);
     return accessory;
